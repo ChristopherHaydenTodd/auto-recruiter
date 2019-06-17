@@ -1,0 +1,5 @@
+ctodd-python-lib-data-structures >= 1.0.0
+ctodd-python-lib-execution>=1.0.0
+ctodd-python-lib-logging>=1.0.0
+pytz>=2019.1
+XlsxWriter>=1.1.8
