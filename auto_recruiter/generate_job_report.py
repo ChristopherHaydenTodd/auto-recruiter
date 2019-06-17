@@ -1,22 +1,34 @@
 #!/usr/bin/env python3.6
 """
     Purpose:
-        Script responsible for helping organize music files in a
-        specified directory and of a specific music filetype
+        Script responsible for pulling jobs from job boards and generating a
+        report. for each job title and job board
     Steps:
-        - Parse Location of Music from CLI
-        - Determine Music Extension (Default .mp3)
-        - Find all music files in the directory
-        - Get the Artist for each File (From metadata, using eyeD3)
-        - Create Dir for Each Artist
-        - Move each song into the directory
+        - Parse CLI args
+        - For each job board and job title
+            - pull job listings based on the search params
+            - pull details for each job in the list
+        - Generate a report with all of the jobs
 
     usage:
-        python3.6 organize_music_by_artist.py [-h] --music-dir MUSIC_DIR\
-            [--music-format MUSIC_FORMAT]
+        python3.6 generate_job_report.py
+            --job-boards {indeed,monster,career_builder} -
+            -job-titles JOB_TITLES
+            [--report-output-filename REPORT_OUTPUT_FILENAME]
+            [--report-output-dir REPORT_OUTPUT_DIR]
+            [--min-jobs MIN_JOBS_TO_FIND]
+            [--zip-code ZIP_CODE] [--radius RADIUS]
+            [--job-type {fulltime,parttime,contractor}]
+            [--salary-min SALARY_MIN]
 
     example call:
-        python3.6 organize_music_by_artist.py --music-dir="~/Music" --music-format=".mp3"
+        python3.6 auto_recruiter/generate_job_report.py \
+            --report-output-filename="office_admin_jobs" \
+            --report-output-dir="../data/job_reports" --min-jobs=15 \
+            --job-boards="indeed"  --job-boards="monster" \
+            --job-title="Administrative Assistant"\
+            --job-title="Office Administrator" --job-title="Office Assistant" \
+            --job-title="Meeting Coordinator"
 """
 
 # Python Library Imports
@@ -38,7 +50,6 @@ BASE_PROJECT_PATH = f"{os.path.dirname(os.path.realpath(__file__))}/../"
 sys.path.insert(0, BASE_PROJECT_PATH)
 from config import config
 from indeed import indeed
-import cached_job_listings
 
 # Globals
 CONFIGS = config.Config.get()
