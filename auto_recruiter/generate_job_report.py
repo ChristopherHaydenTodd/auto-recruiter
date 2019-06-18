@@ -518,12 +518,12 @@ def get_headers_for_job_title_listing_worksheets():
         {
             "name": "city",
             "title": string_helpers.convert_to_title_case("city"),
-            "width": 25,
+            "width": 20,
         },
         {
             "name": "state",
             "title": string_helpers.convert_to_title_case("state"),
-            "width": 25,
+            "width": 15,
         },
         {
             "name": "zip_code",
@@ -531,13 +531,18 @@ def get_headers_for_job_title_listing_worksheets():
             "width": 15,
         },
         {
-            "name": "date_posted",
-            "title": string_helpers.convert_to_title_case("date_posted"),
-            "width": 15,
+            "name": "job_posting_timeframe",
+            "title": string_helpers.convert_to_title_case("job_posting_timeframe"),
+            "width": 20,
         },
         {
             "name": "job_type",
             "title": string_helpers.convert_to_title_case("job_type"),
+            "width": 15,
+        },
+        {
+            "name": "job_salary",
+            "title": string_helpers.convert_to_title_case("job_salary"),
             "width": 25,
         },
         {
@@ -553,6 +558,11 @@ def get_headers_for_job_title_listing_worksheets():
         {
             "name": "job_details_url",
             "title": string_helpers.convert_to_title_case("job_details_url"),
+            "width": 100,
+        },
+        {
+            "name": "job_apply_url",
+            "title": string_helpers.convert_to_title_case("job_apply_url"),
             "width": 100,
         },
     ]
