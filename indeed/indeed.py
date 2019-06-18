@@ -54,7 +54,7 @@ class Indeed(object):
         logging.info("Initializing Indeed")
 
     #####
-    ## Static Methods
+    ## Get Functions
     #####
 
     @staticmethod
@@ -86,35 +86,36 @@ class Indeed(object):
         """
         logging.info(f"Searching for jobs with keywords: {keywords}")
 
-        keywords = keywords.lower().replace(" ", "+")
-
-        job_listing_url = (
-            f"https://www.indeed.com/jobs?q={keywords}+{salary_min}&l="
-            f"{zip_code}&radius={radius}&jt={job_type}&start={pagination}"
+        raw_job_listing_html = Indeed.request_job_listings_from_indeed(
+            keywords,
+            zip_code,
+            radius=radius,
+            job_type=job_type,
+            salary_min=salary_min,
+            pagination=pagination,
         )
 
-        logging.info(f"Fetching HTML from Indeed URL: {job_listing_url}")
-        job_listing_response = requests.get(
-            job_listing_url, headers=Indeed.expected_headers
-        )
-
-        if job_listing_response.status_code == 200:
-            job_listings = Indeed.parse_jobs_from_job_results(job_listing_response.text)
-            for job_listing in job_listings:
-                job_details = Indeed.get_job_details(
-                    job_listing["company"],
-                    job_listing["job_title"],
-                    job_listing["job_id"],
-                )
-
-                for job_detail, job_detail_value in job_details.items():
-                    job_listing[job_detail] = job_detail_value
-
-                job_listing["job_type"] = job_type
-
+        # Parsing The Job HTML
+        if raw_job_listing_html:
+            job_listings = Indeed.parse_jobs_from_job_results(raw_job_listing_html)
         else:
-            logging.error(f"Failed to Fetch HTML from Indeed URL ({job_url}): {err}")
+            logging.error(f"Failed to Fetch HTML from Indeed URL, exiting")
             job_listings = []
+
+        # Get More Information For Each Job Listing
+        for job_listing in job_listings:
+
+            # Add Job Type As A Field
+            job_listing["job_type"] = job_type
+
+            # Get Job Details
+            job_details = Indeed.get_job_details(
+                job_listing["company"],
+                job_listing["job_title"],
+                job_listing["job_id"],
+            )
+            for job_detail, job_detail_value in job_details.items():
+                job_listing[job_detail] = job_detail_value
 
         return sorted(job_listings, key = lambda i: i["company"])
 
@@ -145,9 +146,67 @@ class Indeed(object):
         return job_details
 
     ###
+    # Functions to Pull Raw Results From to Indeed.com
+    ###
+
+    @staticmethod
+    def request_job_listings_from_indeed(
+        keywords,
+        zip_code,
+        radius=15,
+        job_type="fulltime",
+        salary_min="$40,000",
+        pagination=0
+    ):
+        """
+        Purpose:
+            Get Job Listing HTML from Indeed.com by calling the website and
+            parsing the results into a variabl. Search for jobs using
+            keyword, zip_code, radius, job_type, and salary
+        Args:
+            keywords (String): Keywords to Search
+            zip_code (String): Zip code to center the job search on
+            radius (String): Radius (from the zip code center) that jobs need to be
+                in to be considered
+            job_type (String): type of job. Enum of the following:
+                [fulltime, parttime, contractor]
+            salary_min (String): Minimum salary for jobs to be returned (best guess if
+                none is provided)
+            pagination (String): The job to start on. If 0, page 1 of results. Page 2
+                starts at 10. This gets different results depending on usage
+        Returns:
+            raw_job_listing_html (String): Raw HTML results from Indeed.com of the job
+                listings matching the search criteria
+        """
+
+        keywords = keywords.lower().replace(" ", "+")
+
+        job_listing_url = (
+            f"https://www.indeed.com/jobs?q={keywords}+{salary_min}&l="
+            f"{zip_code}&radius={radius}&jt={job_type}&start={pagination}"
+        )
+
+        logging.info(f"Fetching HTML from Indeed URL: {job_listing_url}")
+        job_listing_response = requests.get(
+            job_listing_url, headers=Indeed.expected_headers
+        )
+
+        if job_listing_response.status_code == 200:
+            raw_job_listing_html = job_listing_response.text
+        else:
+            logging.error(
+                "Got Failure Response from Indeed.com: "
+                f"{job_listing_response.status_code}"
+            )
+            raw_job_listing_html = None
+
+        return raw_job_listing_html
+
+    ###
     # HTML Parsing
     ###
 
+    @staticmethod
     def parse_jobs_from_job_results(job_html):
         """
         Purpose:
