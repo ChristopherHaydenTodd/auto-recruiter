@@ -536,6 +536,11 @@ def get_headers_for_job_title_listing_worksheets():
             "width": 20,
         },
         {
+            "name": "college_degree",
+            "title": string_helpers.convert_to_title_case("college_degree"),
+            "width": 25,
+        },
+        {
             "name": "job_type",
             "title": string_helpers.convert_to_title_case("job_type"),
             "width": 15,

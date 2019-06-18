@@ -156,6 +156,7 @@ class Indeed(object):
             job_details["city"] = None
             job_details["state"] = None
             job_details["zip_code"] = None
+            job_details["college_degree"] = None
 
         # Adding in the URL for easier searching =
         job_details["job_details_url"] =\
@@ -470,6 +471,14 @@ class Indeed(object):
             job_details["city"] = None
             job_details["state"] = None
             job_details["zip_code"] = None
+
+        # College Degree
+        if "associates" in job_details["job_description"]:
+            job_details["college_degree"] = "Associates"
+        elif "bachelor" in job_details["job_description"]:
+            job_details["college_degree"] = "Bachelor's"
+        else:
+            job_details["college_degree"] = "Not Specified"
 
         return job_details
 
