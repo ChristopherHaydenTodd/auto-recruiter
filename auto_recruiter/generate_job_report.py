@@ -296,9 +296,9 @@ def create_job_report(
         f"{report_output_dir}/{report_output_filename}_{report_date}.xlsx"
     )
 
-    # Generate the Global Worksheet First
-    global_job_listings = get_global_job_listings(job_listings_by_job_board)
-    create_global_worksheet(workbook, "Global", global_job_listings)
+    # # Generate the Global Worksheet First
+    # global_job_listings = get_global_job_listings(job_listings_by_job_board)
+    # create_global_worksheet(workbook, "Global", global_job_listings)
 
     # Generate a Sheet for Each Job Board/Job Title Combination
     for job_board, job_listings_by_title in job_listings_by_job_board.items():
@@ -357,7 +357,7 @@ def create_job_board_worksheet(workbook, sheet_name, job_listings):
     for row_idx in range(1, max_row):
         worksheet.set_row(row_idx, 32)
 
-    # Set Table Options
+    # Set Table Options And Create Table
     table_dimensions = "{column_start}{row_start}:{column_end}{row_end}".format(
         column_start="A",
         row_start=min_row,
@@ -365,22 +365,23 @@ def create_job_board_worksheet(workbook, sheet_name, job_listings):
         row_end=max_row,
     )
     table_options = {
-        "name": re.sub("[^a-zA-Z]+", "", sheet_name)
+        "name": re.sub("[^a-zA-Z]+", "", sheet_name),
+        "columns": [{"header": header["title"]} for header in headers],
     }
     worksheet.add_table(table_dimensions, table_options)
 
-    header_row_idx = 0
-    for header_column_idx, header in enumerate(headers):
-        worksheet.write(header_row_idx, header_column_idx, header["title"])
-
+    # Write Data to Table
     job_listing_row_idx = 1
     for job_id, job_details in job_listings.items():
 
         for header_column_idx, header in enumerate(headers):
-            worksheet.write(
+
+            cell_value = job_details[header["name"]]
+
+            get_write_function(cell_value, worksheet)(
                 job_listing_row_idx,
                 header_column_idx,
-                job_details[header["name"]],
+                cell_value,
                 cell_format,
             )
 
@@ -426,7 +427,7 @@ def create_global_worksheet(workbook, sheet_name, job_listings):
     for row_idx in range(1, max_row):
         worksheet.set_row(row_idx, 32)
 
-    # Set Table Options and Create Table
+    # Set Table Options And Create Table
     table_dimensions = "{column_start}{row_start}:{column_end}{row_end}".format(
         column_start="A",
         row_start=min_row,
@@ -434,26 +435,57 @@ def create_global_worksheet(workbook, sheet_name, job_listings):
         row_end=max_row,
     )
     table_options = {
-        "name": re.sub("[^a-zA-Z]+", "", sheet_name)
+        "name": re.sub("[^a-zA-Z]+", "", sheet_name),
+        "columns": [{"header": header["title"]} for header in headers],
     }
     worksheet.add_table(table_dimensions, table_options)
 
-    header_row_idx = 0
-    for header_column_idx, header in enumerate(headers):
-        worksheet.write(header_row_idx, header_column_idx, header["title"])
-
+    # Write Data to Table
     job_listing_row_idx = 1
     for job_id, job_details in job_listings.items():
 
         for header_column_idx, header in enumerate(headers):
-            worksheet.write(
+
+            cell_value = job_details[header["name"]]
+
+            get_write_function(cell_value, worksheet)(
                 job_listing_row_idx,
                 header_column_idx,
-                job_details[header["name"]],
+                cell_value,
                 cell_format,
             )
 
         job_listing_row_idx += 1
+
+
+def get_write_function(data, worksheet):
+    """
+    Purpose:
+        Get the write function for a specific type of data
+    Args:
+        data (Object, various types): data to inspect and get write function
+    Returns:
+        xlsxwriter_function (Function): Function to use to write data to xlsx.
+    """
+
+    if not data:
+        return worksheet.write_blank
+    elif isinstance(data, datetime):
+        return worksheet.write_datetime
+    elif isinstance(data, float) or isinstance(data, int):
+        return worksheet.write_number
+    elif isinstance(data, bool):
+        return worksheet.write_boolean
+    elif isinstance(data, str) and data.lower() in ("true", "false"):
+        return worksheet.write_boolean
+    elif isinstance(data, str) and "http" in data:
+        return worksheet.write_url
+    elif isinstance(data, str) and data.startswith("="):
+        return worksheet.write_formula
+    elif isinstance(data, str):
+        return worksheet.write_string
+    else:
+        return worksheet.write_string
 
 
 def get_headers_for_job_title_listing_worksheets():
