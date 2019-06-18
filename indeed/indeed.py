@@ -6,6 +6,7 @@
 """
 
 # Python Library Imports
+import json
 import logging
 import re
 import requests
@@ -107,7 +108,12 @@ class Indeed(object):
         for job_listing in job_listings:
 
             # Add Job Type As A Field
-            job_listing["job_type"] = job_type
+            if job_type == "fulltime":
+                job_listing["job_type"] = "Full Time"
+            elif job_type == "partime":
+                job_listing["job_type"] = "Part Time"
+            else:
+                job_listing["job_type"] = "Unknown"
 
             # Get Job Details
             job_details = Indeed.get_job_details(
@@ -143,6 +149,13 @@ class Indeed(object):
             job_details = Indeed.parse_job_details_html(raw_job_details_html)
         else:
             logging.error(f"Failed to Fetch Job Details from Indeed URL, exiting")
+            job_details["job_description"] = None
+            job_details["job_apply_url"] = None
+            job_details["job_posting_timeframe"] = None
+            job_details["init_data"] = {}
+            job_details["city"] = None
+            job_details["state"] = None
+            job_details["zip_code"] = None
 
         # Adding in the URL for easier searching =
         job_details["job_details_url"] =\
@@ -300,7 +313,7 @@ class Indeed(object):
                     job_listing_card.find("span", {"class": "company"}).text,
                 ).strip()
             except Exception as err:
-                company = "-"
+                company = None
 
             try:
                 job_id = (
@@ -311,7 +324,7 @@ class Indeed(object):
                     .strip()
                 )
             except Exception as err:
-                job_id = "-"
+                job_id = None
 
             try:
                 job_summary = re.sub(
@@ -320,7 +333,7 @@ class Indeed(object):
                     job_listing_card.find("div", {"class": "summary"}).text,
                 ).strip()
             except Exception as err:
-                job_summary = "-"
+                job_summary = None
 
             try:
                 job_title = re.sub(
@@ -329,16 +342,16 @@ class Indeed(object):
                     job_listing_card.find("div", {"class": "title"}).text,
                 ).strip()
             except Exception as err:
-                job_title = "-"
+                job_title = None
 
             try:
                 job_salary = re.sub(
                     regex_remove_characters,
                     " ",
-                    job_listing_card.find("div", {"class": "salary"}).text,
+                    job_listing_card.find("span", {"class": "salary"}).text,
                 ).strip()
             except Exception as err:
-                job_salary = "-"
+                job_salary = None
 
             try:
                 re.sub(
@@ -357,10 +370,6 @@ class Indeed(object):
                 "job_title": job_title,
                 "job_salary": job_salary,
                 "easy_apply": easy_apply,
-                "date_posted": "-",
-                "city": "-",
-                "state": "-",
-                "zip_code": "-",
             })
 
         return job_listings
@@ -381,6 +390,86 @@ class Indeed(object):
 
         # Parse Main DOM
         job_details_beautiful_soup = BeautifulSoup(raw_job_details_html, "html.parser")
+
+        # Get Raw Description
+        try:
+            raw_job_description = job_details_beautiful_soup.find(
+                "div",
+                {"id": "jobDescriptionText"}
+            )
+            job_details["job_description"] = raw_job_description.text.strip()
+        except Exception as err:
+            job_details["job_description"] = None
+
+        # Get Apply Link
+        try:
+            raw_job_apply_span = job_details_beautiful_soup.find(
+                "span",
+                {"id": "originalJobLinkContainer"}
+            )
+            job_details["job_apply_url"] = raw_job_apply_span.find("a")["href"]
+        except Exception as err:
+            job_details["job_apply_url"] = None
+
+        # Get When job was posted
+        try:
+
+            raw_job_posting_metadata = job_details_beautiful_soup.find(
+                "div",
+                {"class": "jobsearch-JobMetadataFooter"}
+            )
+
+            job_details["job_posting_timeframe"] = None
+            for job_metadata_value in raw_job_posting_metadata.text.split("-"):
+                if "ago" in job_metadata_value:
+                    job_details["job_posting_timeframe"] = job_metadata_value.strip()
+                    break
+
+        except Exception as err:
+            job_details["job_posting_timeframe"] = None
+
+        # Get Job Init Data (has interesting Information on the job)
+        try:
+            start_data_string = "window._initialData="
+            start_data_string_location =\
+                raw_job_details_html.find(start_data_string) + len(start_data_string)
+            stripped_raw_job_details_html =\
+                raw_job_details_html[start_data_string_location:]
+            end_data_string = ";</script>"
+            end_data_string_location =\
+                stripped_raw_job_details_html.find(end_data_string)
+            raw_init_data = stripped_raw_job_details_html[:end_data_string_location]
+            job_details["init_data"] = json.loads(raw_init_data)
+        except Exception as err:
+            job_details["init_data"] = {}
+
+        # Get Job Location (from init_data)
+        try:
+            location_string = job_details["init_data"].get("jobLocation", None)
+
+            if not location_string:
+                job_details["city"] = None
+                job_details["state"] = None
+                job_details["zip_code"] = None
+            else:
+
+                if location_string.split()[-1].strip().isdigit():
+                    job_details["zip_code"] = location_string.split()[-1].strip()
+                    location_string = " ".join(location_string.split()[:-1])
+                else:
+                    job_details["zip_code"] = None
+
+                if "," in location_string:
+                    job_details["city"] = location_string.split(",")[0].strip()
+                    job_details["state"] = location_string.split(",")[-1].strip()
+                else:
+                    job_details["city"] = location_string
+                    job_details["state"] = None
+
+        except Exception as err:
+            job_details["city"] = None
+            job_details["state"] = None
+            job_details["zip_code"] = None
 
         return job_details
 
