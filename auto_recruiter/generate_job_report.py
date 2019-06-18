@@ -297,8 +297,8 @@ def create_job_report(
     )
 
     # # Generate the Global Worksheet First
-    # global_job_listings = get_global_job_listings(job_listings_by_job_board)
-    # create_global_worksheet(workbook, "Global", global_job_listings)
+    global_job_listings = get_global_job_listings(job_listings_by_job_board)
+    create_global_worksheet(workbook, "Global", global_job_listings)
 
     # Generate a Sheet for Each Job Board/Job Title Combination
     for job_board, job_listings_by_title in job_listings_by_job_board.items():
