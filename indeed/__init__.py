@@ -4,3 +4,4 @@
 """
 
 from .indeed import *
+from .cached_data import *
