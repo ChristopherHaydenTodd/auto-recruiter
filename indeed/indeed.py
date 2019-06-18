@@ -86,6 +86,8 @@ class Indeed(object):
         """
         logging.info(f"Searching for jobs with keywords: {keywords}")
 
+        job_listings = []
+
         raw_job_listing_html = Indeed.request_job_listings_from_indeed(
             keywords,
             zip_code,
@@ -97,10 +99,9 @@ class Indeed(object):
 
         # Parsing The Job HTML
         if raw_job_listing_html:
-            job_listings = Indeed.parse_jobs_from_job_results(raw_job_listing_html)
+            job_listings = Indeed.parse_job_listings_html(raw_job_listing_html)
         else:
-            logging.error(f"Failed to Fetch HTML from Indeed URL, exiting")
-            job_listings = []
+            logging.error(f"Failed to Fetch Job Listings from Indeed URL, exiting")
 
         # Get More Information For Each Job Listing
         for job_listing in job_listings:
@@ -131,17 +132,21 @@ class Indeed(object):
         Returns:
             N/A
         """
-        company = company.replace(" ", "-")
-        job_title = job_title.replace(" ", "-")
-        job_id = job_id.replace(" ", "-")
-        logging.info(f"Getting Metadata for {company}: {job_title}-{job_id}")
 
         job_details = {}
 
-        job_url = f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
-        job_details["job_url"] = job_url
+        raw_job_details_html =\
+            Indeed.request_job_details_from_indeed(company, job_title, job_id)
 
-        # Get the HTML from the URL
+        # Parsing The Job HTML
+        if raw_job_details_html:
+            job_details = Indeed.parse_job_details_html(raw_job_details_html)
+        else:
+            logging.error(f"Failed to Fetch Job Details from Indeed URL, exiting")
+
+        # Adding in the URL for easier searching =
+        job_details["job_details_url"] =\
+            Indeed.generate_job_details_url(company, job_title, job_id)
 
         return job_details
 
@@ -161,7 +166,7 @@ class Indeed(object):
         """
         Purpose:
             Get Job Listing HTML from Indeed.com by calling the website and
-            parsing the results into a variabl. Search for jobs using
+            parsing the results into a dict. Search for jobs using
             keyword, zip_code, radius, job_type, and salary
         Args:
             keywords (String): Keywords to Search
@@ -202,42 +207,104 @@ class Indeed(object):
 
         return raw_job_listing_html
 
+    @staticmethod
+    def request_job_details_from_indeed(company, job_title, job_id):
+        """
+        Purpose:
+            Get Job Details HTML from Indeed.com by calling the website and
+            parsing the results into a dict.
+        Args:
+            company (String): Name of the company the job is with
+            job_title (String): The title of the position with the company
+            job_id (String): The unqiue job_id from Indeed
+        Returns:
+            raw_job_details_html (String): Raw HTML results from Indeed.com of the job
+                details
+        """
+
+        # Getting URL
+        job_details_url = Indeed.generate_job_details_url(company, job_title, job_id)
+
+        logging.info(f"Fetching HTML from Indeed URL: {job_details_url}")
+        job_details_response = requests.get(
+            job_details_url, headers=Indeed.expected_headers
+        )
+
+        if job_details_response.status_code == 200:
+            raw_job_details_html = job_details_response.text
+        else:
+            logging.error(
+                "Got Failure Response from Indeed.com: "
+                f"{job_details_response.status_code}"
+            )
+            raw_job_details_html = None
+
+        return raw_job_details_html
+
+    @staticmethod
+    def generate_job_details_url(company, job_title, job_id):
+        """
+        Purpose:
+            Get Job Details URL From the company, job_title, and job_id
+        Args:
+            company (String): Name of the company the job is with
+            job_title (String): The title of the position with the company
+            job_id (String): The unqiue job_id from Indeed
+        Returns:
+            job_details_url (String): URL to call to get job details based on
+                a job listing
+        """
+
+        # Format the variables according to how Indeed Expects them
+        company = company.replace(" ", "-")
+        job_title = job_title.replace(" ", "-")
+        job_id = job_id.replace(" ", "-")
+
+        # Generating the Job Details URLURL
+        job_details_url =\
+            f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
+
+        return job_details_url
+
     ###
     # HTML Parsing
     ###
 
     @staticmethod
-    def parse_jobs_from_job_results(job_html):
+    def parse_job_listings_html(raw_job_listing_html):
         """
         Purpose:
-            Get jobs from Indeed UI. Call the UI and parse the HTML with Beautiful Soup.
+            parse the HTML with Beautiful Soup.
         Args:
-            job_html (String): HTML string to parse utilizing beautiful soup
+            raw_job_listing_html (String): HTML string to parse utilizing beautiful soup.
+                Contains the HTML of the job listings
         Return:
-            job_listings (List of Dicts): Jobs that have been found
+            job_listings (List of Dicts): Job listings that have been found
         """
 
         job_listings = []
 
-        beautiful_soup = BeautifulSoup(job_html, "html.parser")
+        # Parse Main DOM
+        job_listing_beautiful_soup = BeautifulSoup(raw_job_listing_html, "html.parser")
+        job_listing_cards =\
+            job_listing_beautiful_soup.findAll("div", {"class": "jobsearch-SerpJobCard"})
 
-        # job_cards = beautiful_soup.find("div", {"data-tn-component": "organicJob"})
-        # job_cards = beautiful_soup.findAll("div", {"class": "result-link-bar"})
-        job_cards = beautiful_soup.findAll("div", {"class": "jobsearch-SerpJobCard"})
-        for job_card in job_cards:
-            text_cleaner_regex = r"[^A-Za-z0-9\.\-\?\!\,\$\%\&\#\@\^\*\(\)]+"
+        # Get Each Job Listing
+        for job_listing_card in job_listing_cards:
+            regex_remove_characters = r"[^A-Za-z0-9\.\-\?\!\,\$\%\&\#\@\^\*\(\)]+"
 
             try:
                 company = re.sub(
-                    text_cleaner_regex,
+                    regex_remove_characters,
                     " ",
-                    job_card.find("span", {"class": "company"}).text,
+                    job_listing_card.find("span", {"class": "company"}).text,
                 ).strip()
             except Exception as err:
                 company = "-"
+
             try:
                 job_id = (
-                    job_card.find("div", {"class": "sjcl"})
+                    job_listing_card.find("div", {"class": "sjcl"})
                     .find("div", {"class": "recJobLoc"})
                     .get("id")
                     .lstrip("recJobLoc_")
@@ -245,35 +312,39 @@ class Indeed(object):
                 )
             except Exception as err:
                 job_id = "-"
+
             try:
                 job_summary = re.sub(
-                    text_cleaner_regex,
+                    regex_remove_characters,
                     " ",
-                    job_card.find("div", {"class": "summary"}).text,
+                    job_listing_card.find("div", {"class": "summary"}).text,
                 ).strip()
-            except job_summary as err:
+            except Exception as err:
                 job_summary = "-"
+
             try:
                 job_title = re.sub(
-                    text_cleaner_regex,
+                    regex_remove_characters,
                     " ",
-                    job_card.find("div", {"class": "title"}).text,
+                    job_listing_card.find("div", {"class": "title"}).text,
                 ).strip()
             except Exception as err:
                 job_title = "-"
+
             try:
                 job_salary = re.sub(
-                    text_cleaner_regex,
+                    regex_remove_characters,
                     " ",
-                    job_card.find("div", {"class": "salary"}).text,
+                    job_listing_card.find("div", {"class": "salary"}).text,
                 ).strip()
             except Exception as err:
                 job_salary = "-"
+
             try:
                 re.sub(
-                    text_cleaner_regex,
+                    regex_remove_characters,
                     " ",
-                    job_card.find("span", {"class": "iaLabel"}).text,
+                    job_listing_card.find("span", {"class": "iaLabel"}).text,
                 ).strip()
                 easy_apply = True
             except Exception as err:
@@ -293,3 +364,23 @@ class Indeed(object):
             })
 
         return job_listings
+
+
+    @staticmethod
+    def parse_job_details_html(raw_job_details_html):
+        """
+        Purpose:
+            Get jobs from Indeed UI. Call the UI and parse the HTML with Beautiful Soup.
+        Args:
+            job_html (String): HTML string to parse utilizing beautiful soup
+        Return:
+            job_listings (List of Dicts): Jobs that have been found
+        """
+
+        job_details = {}
+
+        # Parse Main DOM
+        job_details_beautiful_soup = BeautifulSoup(raw_job_details_html, "html.parser")
+
+        return job_details
+
