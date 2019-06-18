@@ -551,8 +551,8 @@ def get_headers_for_job_title_listing_worksheets():
             "width": 15,
         },
         {
-            "name": "job_url",
-            "title": string_helpers.convert_to_title_case("job_url"),
+            "name": "job_details_url",
+            "title": string_helpers.convert_to_title_case("job_details_url"),
             "width": 100,
         },
     ]
