@@ -237,7 +237,8 @@ class Indeed(object):
                 details
         """
 
-        link_versions = ["v1", "v2", "v3", "v4"]
+        link_versions =\
+            ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"]
         job_details_url = None
         raw_job_details_html = None
 
@@ -267,9 +268,6 @@ class Indeed(object):
 
             if raw_job_details_html:
                 break
-
-        if not raw_job_details_html:
-            import pdb; pdb.set_trace()
 
         return job_details_url, raw_job_details_html
 
@@ -303,6 +301,20 @@ class Indeed(object):
             job_details_url = f"https://www.indeed.com/viewjob?jk=ee{job_id}"
         elif link_version == "v4":
             job_details_url = f"https://www.indeed.com/viewjob?jk=b{job_id}"
+        elif link_version == "v5":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=bb{job_id}"
+        elif link_version == "v6":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=c{job_id}"
+        elif link_version == "v7":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=cc{job_id}"
+        elif link_version == "v8":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=cb{job_id}"
+        elif link_version == "v9":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=eb{job_id}"
+        elif link_version == "v10":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=ce{job_id}"
+        elif link_version == "v11":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=be{job_id}"
         else:
             job_details_url =\
                 f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
@@ -507,9 +519,9 @@ class Indeed(object):
         # College Degree
         if not job_details["job_description"]:
             job_details["college_degree"] = "Not Specified"
-        elif "associates" in job_details["job_description"]:
+        elif "associates" in job_details["job_description"].lower():
             job_details["college_degree"] = "Associates"
-        elif "bachelor" in job_details["job_description"]:
+        elif "bachelor" in job_details["job_description"].lower():
             job_details["college_degree"] = "Bachelor's"
         else:
             job_details["college_degree"] = "Not Specified"
