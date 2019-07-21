@@ -237,7 +237,7 @@ class Indeed(object):
                 details
         """
 
-        link_versions = ["v1", "v2"]
+        link_versions = ["v1", "v2", "v3", "v4"]
         job_details_url = None
         raw_job_details_html = None
 
@@ -268,6 +268,9 @@ class Indeed(object):
             if raw_job_details_html:
                 break
 
+        if not raw_job_details_html:
+            import pdb; pdb.set_trace()
+
         return job_details_url, raw_job_details_html
 
     @staticmethod
@@ -296,6 +299,10 @@ class Indeed(object):
                 f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
         elif link_version == "v2":
             job_details_url = f"https://www.indeed.com/viewjob?jk=e{job_id}"
+        elif link_version == "v3":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=ee{job_id}"
+        elif link_version == "v4":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=b{job_id}"
         else:
             job_details_url =\
                 f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
