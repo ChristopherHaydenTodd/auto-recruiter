@@ -12,6 +12,7 @@
 
     usage:
         python3.6 generate_job_report.py
+            [-h]
             --job-boards {indeed,monster,career_builder} -
             -job-titles JOB_TITLES
             [--report-output-filename REPORT_OUTPUT_FILENAME]
@@ -100,7 +101,6 @@ def main():
         job_listings_by_job_board
     )
 
-
     for job_board, job_listings_by_title in job_listings_by_job_board.items():
         for job_title, job_listings in job_listings_by_title.items():
             try:
@@ -110,7 +110,7 @@ def main():
                     job_listings
                 )
             except Exception as err:
-                logging.exception(f"Failed to Generate Wordcloud {simple_title}: {err}")
+                logging.exception(f"Failed to Generate Wordcloud {job_title}: {err}")
 
 
     logging.info("Starting Process To Find Jobs For Me Complete")
