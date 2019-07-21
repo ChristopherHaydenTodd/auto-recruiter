@@ -91,6 +91,12 @@ def main():
                     cli_args.min_jobs_to_find,
                 )
 
+            simple_title = job_title.replace(" ", "_").strip().lower()
+            try:
+                generate_wordcloud(simple_title, job_listings_by_title[job_title])
+            except Exception as err:
+                logging.exception(f"Failed to Generate Wordcloud {simple_title}: {err}")
+
         job_listings_by_job_board[job_board] = job_listings_by_title
 
     create_job_report(
@@ -265,6 +271,52 @@ def get_global_job_listings(job_listings_by_job_board):
 
 
 ###
+# Wordcloud Generator
+###
+
+
+def generate_wordcloud(generate_wordcloud, job_listings):
+    """
+
+    """
+
+    from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+
+    regex_remove_characters_wordmap = r"[^A-Za-z0-9\.\-\\,\$\%\&\#\@]+"
+    full_stripped_job_descriptions = ""
+
+    for job_id, job_detail in job_listings.items():
+
+        if not job_detail["job_description"]:
+            continue
+
+        stripped_job_description = re.sub(regex_remove_characters_wordmap, " ", job_detail["job_description"]).strip()
+        tokenized_job_description = [x.strip() for x in stripped_job_description.split()]
+        full_stripped_job_descriptions += " ".join(tokenized_job_description)
+
+    # Create stopword list:
+    job_stopwords = set(STOPWORDS)
+
+    # Generate a word cloud image
+    job_wordcloud = WordCloud(
+        stopwords=job_stopwords,
+        background_color="white",
+        height=800,
+        width=1600,
+        min_font_size=12,
+    ).generate(full_stripped_job_descriptions)
+
+    job_wordcloud.to_file(f"{generate_wordcloud}_wordcloud.png")
+
+    word_frequency = {}
+    for word in full_stripped_job_descriptions.split():
+        word_frequency.setdefault(word, 0)
+        word_frequency[word] += 1
+
+    word_frequency = sorted(word_frequency.items(), key = lambda kv:(kv[1], kv[0]))
+
+
+###
 # Report Generator
 ###
 
@@ -341,8 +393,14 @@ def create_job_board_worksheet(workbook, sheet_name, job_listings):
     worksheet = workbook.add_worksheet(sheet_name)
 
     # Set Cell Format
-    cell_format = workbook.add_format()
-    cell_format.set_text_wrap()
+    cell_formats = {
+        "base_cell_format": workbook.add_format({
+            "text_wrap": True
+        }),
+        "date_cell_format": workbook.add_format({
+            "num_format": "[$-en-US]mmmm d, yyyy"
+        }),
+    }
 
     # Get Headers
     headers = get_headers_for_job_title_listing_worksheets()
@@ -378,11 +436,12 @@ def create_job_board_worksheet(workbook, sheet_name, job_listings):
 
             cell_value = job_details[header["name"]]
 
-            get_write_function(cell_value, worksheet)(
+            write_data_to_worksheet(
+                worksheet,
                 job_listing_row_idx,
                 header_column_idx,
                 cell_value,
-                cell_format,
+                cell_formats=cell_formats,
             )
 
         job_listing_row_idx += 1
@@ -410,9 +469,15 @@ def create_global_worksheet(workbook, sheet_name, job_listings):
     # Create Worksheet
     worksheet = workbook.add_worksheet(sheet_name)
 
-    # Set Cell Format
-    cell_format = workbook.add_format()
-    cell_format.set_text_wrap()
+    # Set Cell Formats
+    cell_formats = {
+        "base_cell_format": workbook.add_format({
+            "text_wrap": True
+        }),
+        "date_cell_format": workbook.add_format({
+            "num_format": "[$-en-US]mmmm d, yyyy"
+        }),
+    }
 
     # Get Headers
     headers = get_headers_for_global_job_listing_worksheets()
@@ -448,17 +513,24 @@ def create_global_worksheet(workbook, sheet_name, job_listings):
 
             cell_value = job_details[header["name"]]
 
-            get_write_function(cell_value, worksheet)(
+            write_data_to_worksheet(
+                worksheet,
                 job_listing_row_idx,
                 header_column_idx,
                 cell_value,
-                cell_format,
+                cell_formats=cell_formats,
             )
 
         job_listing_row_idx += 1
 
 
-def get_write_function(data, worksheet):
+def write_data_to_worksheet(
+    worksheet,
+    row_idx,
+    column_idx,
+    cell_value,
+    cell_formats=None
+):
     """
     Purpose:
         Get the write function for a specific type of data
@@ -468,24 +540,46 @@ def get_write_function(data, worksheet):
         xlsxwriter_function (Function): Function to use to write data to xlsx.
     """
 
-    if not data:
-        return worksheet.write_blank
-    elif isinstance(data, datetime):
-        return worksheet.write_datetime
-    elif isinstance(data, float) or isinstance(data, int):
-        return worksheet.write_number
-    elif isinstance(data, bool):
-        return worksheet.write_boolean
-    elif isinstance(data, str) and data.lower() in ("true", "false"):
-        return worksheet.write_boolean
-    elif isinstance(data, str) and "http" in data:
-        return worksheet.write_url
-    elif isinstance(data, str) and data.startswith("="):
-        return worksheet.write_formula
-    elif isinstance(data, str):
-        return worksheet.write_string
+    if not cell_formats:
+        cell_formats = {
+            "base_cell_format": None,
+            "date_cell_format": None,
+        }
+
+    if not cell_value:
+        worksheet.write_blank(row_idx, column_idx, "")
+    elif isinstance(cell_value, datetime):
+        worksheet.write_datetime(
+            row_idx, column_idx, cell_value, cell_formats["date_cell_format"]
+        )
+    elif isinstance(cell_value, float) or isinstance(cell_value, int):
+        worksheet.write_number(
+            row_idx, column_idx, cell_value, cell_formats["base_cell_format"]
+        )
+    elif isinstance(cell_value, bool):
+        worksheet.write_boolean(
+            row_idx, column_idx, cell_value, cell_formats["base_cell_format"]
+            )
+    elif isinstance(cell_value, str) and cell_value.lower() in ("true", "false"):
+        worksheet.write_boolean(
+            row_idx, column_idx, cell_value, cell_formats["base_cell_format"]
+        )
+    elif isinstance(cell_value, str) and "http" in cell_value:
+        worksheet.write_url(
+            row_idx, column_idx, cell_value, cell_formats["base_cell_format"]
+        )
+    elif isinstance(cell_value, str) and cell_value.startswith("="):
+        worksheet.write_formula(
+            row_idx, column_idx, cell_value, cell_formats["base_cell_format"]
+        )
+    elif isinstance(cell_value, str):
+        worksheet.write_string(
+            row_idx, column_idx, cell_value, cell_formats["base_cell_format"]
+        )
     else:
-        return worksheet.write_string
+        worksheet.write_string(
+            row_idx, column_idx, cell_value, cell_formats["base_cell_format"]
+        )
 
 
 def get_headers_for_job_title_listing_worksheets():
@@ -533,6 +627,11 @@ def get_headers_for_job_title_listing_worksheets():
         {
             "name": "job_posting_timeframe",
             "title": string_helpers.convert_to_title_case("job_posting_timeframe"),
+            "width": 20,
+        },
+        {
+            "name": "job_posting_datetime",
+            "title": string_helpers.convert_to_title_case("job_posting_datetime"),
             "width": 20,
         },
         {
