@@ -44,6 +44,7 @@ from data_structure_helpers import string_helpers
 from datetime import datetime
 from execution_helpers import function_executors
 from logging_helpers import loggers
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 
 # Local Library Imports
 BASE_PROJECT_PATH = f"{os.path.dirname(os.path.realpath(__file__))}/../"
@@ -91,12 +92,6 @@ def main():
                     cli_args.min_jobs_to_find,
                 )
 
-            simple_title = job_title.replace(" ", "_").strip().lower()
-            try:
-                generate_wordcloud(simple_title, job_listings_by_title[job_title])
-            except Exception as err:
-                logging.exception(f"Failed to Generate Wordcloud {simple_title}: {err}")
-
         job_listings_by_job_board[job_board] = job_listings_by_title
 
     create_job_report(
@@ -104,6 +99,19 @@ def main():
         cli_args.report_output_filename,
         job_listings_by_job_board
     )
+
+
+    for job_board, job_listings_by_title in job_listings_by_job_board.items():
+        for job_title, job_listings in job_listings_by_title.items():
+            try:
+                generate_wordcloud(
+                    cli_args.report_output_dir,
+                    job_title,
+                    job_listings
+                )
+            except Exception as err:
+                logging.exception(f"Failed to Generate Wordcloud {simple_title}: {err}")
+
 
     logging.info("Starting Process To Find Jobs For Me Complete")
 
@@ -275,12 +283,16 @@ def get_global_job_listings(job_listings_by_job_board):
 ###
 
 
-def generate_wordcloud(generate_wordcloud, job_listings):
+def generate_wordcloud(
+    output_dir,
+    job_title,
+    job_listings
+):
     """
 
     """
 
-    from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+    simple_title = job_title.replace(" ", "_").strip().lower()
 
     regex_remove_characters_wordmap = r"[^A-Za-z0-9\.\-\\,\$\%\&\#\@]+"
     full_stripped_job_descriptions = ""
@@ -306,7 +318,9 @@ def generate_wordcloud(generate_wordcloud, job_listings):
         min_font_size=12,
     ).generate(full_stripped_job_descriptions)
 
-    job_wordcloud.to_file(f"{generate_wordcloud}_wordcloud.png")
+    job_wordcloud.to_file(
+        f"{output_dir}/../wordclouds/{job_title}.png".lower()
+    )
 
     word_frequency = {}
     for word in full_stripped_job_descriptions.split():
@@ -413,7 +427,7 @@ def create_job_board_worksheet(workbook, sheet_name, job_listings):
     min_row = 1
     max_row = 1 + len(job_listings)
     for row_idx in range(1, max_row):
-        worksheet.set_row(row_idx, 32)
+        worksheet.set_row(row_idx, 48)
 
     # Set Table Options And Create Table
     table_dimensions = "{column_start}{row_start}:{column_end}{row_end}".format(
@@ -607,7 +621,7 @@ def get_headers_for_job_title_listing_worksheets():
         {
             "name": "job_summary",
             "title": string_helpers.convert_to_title_case("job_summary"),
-            "width": 50,
+            "width": 75,
         },
         {
             "name": "city",
