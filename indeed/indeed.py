@@ -237,48 +237,41 @@ class Indeed(object):
                 details
         """
 
-        # Getting URL
-        job_details_url = Indeed.generate_job_details_url(company, job_title, job_id)
+        link_versions = ["v1", "v2"]
+        job_details_url = None
+        raw_job_details_html = None
 
-        logging.info(f"Fetching HTML from Indeed URL: {job_details_url}")
-        job_details_response = requests.get(
-            job_details_url, headers=Indeed.expected_headers
-        )
+        for link_version in link_versions:
 
-        if job_details_response.status_code == 200:
-            raw_job_details_html = job_details_response.text
-        else:
-            logging.error(
-                "Got Failure Response from Indeed.com for Details v1: "
-                f"{job_details_response.status_code}"
+            # Getting URL From Version
+            job_details_url = Indeed.generate_job_details_url(
+                company, job_title, job_id, link_version=link_version
             )
-            raw_job_details_html = None
 
-        if raw_job_details_html:
-            return job_details_url, raw_job_details_html
-
-        # Trying 2nd Details URL
-        job_details_url = Indeed.generate_job_details_url_v2(job_id)
-
-        logging.info(f"Fetching HTML from Indeed URL: {job_details_url}")
-        job_details_response = requests.get(
-            job_details_url, headers=Indeed.expected_headers
-        )
-
-        if job_details_response.status_code == 200:
-            raw_job_details_html = job_details_response.text
-        else:
-            logging.error(
-                "Got Failure Response from Indeed.com for Details v2: "
-                f"{job_details_response.status_code}"
+            logging.info(
+                f"Fetching HTML from Indeed URL ({link_version}): {job_details_url}"
             )
-            raw_job_details_html = None
-            job_details_url = None
+            job_details_response = requests.get(
+                job_details_url, headers=Indeed.expected_headers
+            )
+
+            if job_details_response.status_code == 200:
+                raw_job_details_html = job_details_response.text
+            else:
+                logging.error(
+                    f"Got Failure Response from Indeed.com (Details {link_version}): "
+                    f"{job_details_response.status_code}"
+                )
+                raw_job_details_html = None
+                job_details_url = None
+
+            if raw_job_details_html:
+                break
 
         return job_details_url, raw_job_details_html
 
     @staticmethod
-    def generate_job_details_url(company, job_title, job_id):
+    def generate_job_details_url(company, job_title, job_id, link_version="v1"):
         """
         Purpose:
             Get Job Details URL From the company, job_title, and job_id
@@ -296,31 +289,18 @@ class Indeed(object):
         job_title = job_title.replace(" ", "-")
         job_id = job_id.replace(" ", "-")
 
-        # Generating the Job Details URLURL
-        job_details_url =\
-            f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
+        # Generating the Job Details URL
+
+        if link_version == "v1":
+            job_details_url =\
+                f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
+        elif link_version == "v2":
+            job_details_url = f"https://www.indeed.com/viewjob?jk=e{job_id}"
+        else:
+            job_details_url =\
+                f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
 
         return job_details_url
-
-    @staticmethod
-    def generate_job_details_url_v2(job_id):
-        """
-        Purpose:
-            Get Job Details URL From the job_id only
-        Args:
-            job_id (String): The unqiue job_id from Indeed
-        Returns:
-            job_details_url_v2 (String): URL to call to get job details based on
-                a job listing
-        """
-
-        # Format the variables according to how Indeed Expects them
-        job_id = job_id.replace(" ", "-")
-
-        # Generating the Job Details URLURL
-        job_details_url_v2 = f"https://www.indeed.com/viewjob?jk=e{job_id}"
-
-        return job_details_url_v2
 
     ###
     # HTML Parsing
