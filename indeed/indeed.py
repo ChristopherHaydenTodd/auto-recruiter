@@ -11,6 +11,7 @@ import logging
 import re
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
 
 ###
@@ -152,6 +153,7 @@ class Indeed(object):
             job_details["job_description"] = None
             job_details["job_apply_url"] = None
             job_details["job_posting_timeframe"] = None
+            job_details["job_posting_datetime"] = None
             job_details["init_data"] = {}
             job_details["city"] = None
             job_details["state"] = None
@@ -375,7 +377,6 @@ class Indeed(object):
 
         return job_listings
 
-
     @staticmethod
     def parse_job_details_html(raw_job_details_html):
         """
@@ -426,8 +427,12 @@ class Indeed(object):
                     job_details["job_posting_timeframe"] = job_metadata_value.strip()
                     break
 
+            job_details["job_posting_datetime"] =\
+                Indeed.parse_job_posting_datetime(job_details["job_posting_timeframe"])
+
         except Exception as err:
             job_details["job_posting_timeframe"] = None
+            job_details["job_posting_datetime"] = None
 
         # Get Job Init Data (has interesting Information on the job)
         try:
@@ -473,7 +478,9 @@ class Indeed(object):
             job_details["zip_code"] = None
 
         # College Degree
-        if "associates" in job_details["job_description"]:
+        if not job_details["job_description"]:
+            job_details["college_degree"] = "Not Specified"
+        elif "associates" in job_details["job_description"]:
             job_details["college_degree"] = "Associates"
         elif "bachelor" in job_details["job_description"]:
             job_details["college_degree"] = "Bachelor's"
@@ -482,3 +489,34 @@ class Indeed(object):
 
         return job_details
 
+    ###
+    # HTML Parsing
+    ###
+
+    @staticmethod
+    def parse_job_posting_datetime(job_posting_timeframe):
+        """
+        Purpose:
+            parse the job posting timeframe into a date
+        Args:
+            job_posting_timeframe (String): How long ago the job was posted
+        Return:
+            job_posting_datetime (Datetime OBj): Datetime of the job posting
+        """
+
+        current_date = datetime.now()
+        job_posting_datetime = None
+
+        if not job_posting_timeframe:
+            job_posting_date = current_date - timedelta(days=31)
+        elif "hour" in job_posting_timeframe:
+            hours_ago = int(job_posting_timeframe.split()[0])
+            job_posting_datetime = current_date - timedelta(hours=hours_ago)
+        elif "day" in job_posting_timeframe:
+            if "30+" in job_posting_timeframe:
+                days_ago = 31
+            else:
+                days_ago = int(job_posting_timeframe.split()[0])
+            job_posting_datetime = current_date - timedelta(days=days_ago)
+
+        return job_posting_datetime
