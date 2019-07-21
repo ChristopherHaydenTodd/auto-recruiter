@@ -142,8 +142,8 @@ class Indeed(object):
 
         job_details = {}
 
-        raw_job_details_html =\
-            Indeed.request_job_details_from_indeed(company, job_title, job_id)
+        job_details_url, raw_job_details_html =\
+            Indeed.request_job_details_from_indeed(company, job_title, job_id)\
 
         # Parsing The Job HTML
         if raw_job_details_html:
@@ -160,9 +160,8 @@ class Indeed(object):
             job_details["zip_code"] = None
             job_details["college_degree"] = None
 
-        # Adding in the URL for easier searching =
-        job_details["job_details_url"] =\
-            Indeed.generate_job_details_url(company, job_title, job_id)
+        # Adding in the URL for easier searching
+        job_details["job_details_url"] = job_details_url
 
         return job_details
 
@@ -250,12 +249,33 @@ class Indeed(object):
             raw_job_details_html = job_details_response.text
         else:
             logging.error(
-                "Got Failure Response from Indeed.com: "
+                "Got Failure Response from Indeed.com for Details v1: "
                 f"{job_details_response.status_code}"
             )
             raw_job_details_html = None
 
-        return raw_job_details_html
+        if raw_job_details_html:
+            return job_details_url, raw_job_details_html
+
+        # Trying 2nd Details URL
+        job_details_url = Indeed.generate_job_details_url_v2(job_id)
+
+        logging.info(f"Fetching HTML from Indeed URL: {job_details_url}")
+        job_details_response = requests.get(
+            job_details_url, headers=Indeed.expected_headers
+        )
+
+        if job_details_response.status_code == 200:
+            raw_job_details_html = job_details_response.text
+        else:
+            logging.error(
+                "Got Failure Response from Indeed.com for Details v2: "
+                f"{job_details_response.status_code}"
+            )
+            raw_job_details_html = None
+            job_details_url = None
+
+        return job_details_url, raw_job_details_html
 
     @staticmethod
     def generate_job_details_url(company, job_title, job_id):
@@ -281,6 +301,26 @@ class Indeed(object):
             f"https://www.indeed.com/cmp/{company}/jobs/{job_title}-{job_id}"
 
         return job_details_url
+
+    @staticmethod
+    def generate_job_details_url_v2(job_id):
+        """
+        Purpose:
+            Get Job Details URL From the job_id only
+        Args:
+            job_id (String): The unqiue job_id from Indeed
+        Returns:
+            job_details_url_v2 (String): URL to call to get job details based on
+                a job listing
+        """
+
+        # Format the variables according to how Indeed Expects them
+        job_id = job_id.replace(" ", "-")
+
+        # Generating the Job Details URLURL
+        job_details_url_v2 = f"https://www.indeed.com/viewjob?jk=e{job_id}"
+
+        return job_details_url_v2
 
     ###
     # HTML Parsing
