@@ -50,7 +50,8 @@ def main():
     cli_args = get_cli_arguments()
 
     job_report_files = get_available_job_reports(
-        cli_args.job_report_base_dir
+        cli_args.job_report_base_dir,
+        report_filter=cli_args.report_filter,
     )
 
     gmail_credentials = gmail_helpers.get_gmail_credentials(
@@ -73,15 +74,26 @@ def main():
 ###
 
 
-def get_available_job_reports(job_report_base_dir, report_date=None):
+def get_available_job_reports(
+    job_report_base_dir,
+    report_date=None,
+    report_filter=None
+):
     """
     Purpose:
         Get availale job reports to send
     Args:
         job_report_base_dir (String): Base dir to look for reports
+        report_date (String): Date string in %Y%m%d form to get reports to send
+        report_filter (String): Filter for reports. substring that must be in the
+            report name to be sent
     Returns:
         job_report_files (List of Strings): Available Reports to Send
     """
+    logging.info(
+        f"Getting job reports in {job_report_base_dir} ("
+        f"report_date={report_date} and report_filter={report_filter}"
+    )
 
     if not report_date:
         report_date = datetime.now().strftime("%Y%m%d")
@@ -94,6 +106,17 @@ def get_available_job_reports(job_report_base_dir, report_date=None):
         and job_report.endswith(".xlsx")
         and report_date in job_report
     ]
+
+    if report_filter:
+        job_report_files = [
+            job_report_file
+            for job_report_file
+            in job_report_files
+            if report_filter in job_report_file
+        ]
+
+    if not job_report_files:
+        raise Exception("No Job Reports Found")
 
     return job_report_files
 
@@ -171,7 +194,14 @@ def get_cli_arguments():
         type=str,
         default=os.path.expanduser("~/.gmail/gmail_credentials.json"),
     )
-
+    optional.add_argument(
+        "--report-filter",
+        dest="report_filter",
+        help="Filter for reports to send",
+        required=False,
+        type=str,
+        default=None,
+    )
 
     # Required Arguments
     required.add_argument(
