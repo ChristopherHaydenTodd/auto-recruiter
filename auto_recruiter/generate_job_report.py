@@ -91,6 +91,7 @@ def main():
                     cli_args.job_type,
                     cli_args.salary_min,
                     cli_args.min_jobs_to_find,
+                    cli_args.max_days_since_posting,
                 )
 
         job_listings_by_job_board[job_board] = job_listings_by_title
@@ -122,7 +123,13 @@ def main():
 
 
 def get_job_listings_from_indeed(
-    job_title, zip_code, radius, job_type, salary_min, min_jobs_to_find
+    job_title,
+    zip_code,
+    radius,
+    job_type,
+    salary_min,
+    min_jobs_to_find,
+    max_days_since_posting,
 ):
     """
     Purpose:
@@ -140,6 +147,8 @@ def get_job_listings_from_indeed(
         min_jobs_to_find (String): How many jobs to attempt to find. will loop through
             calls to Indeed until this number is met or if 5 calls in a row yeild
             no new results
+        max_days_since_posting (Int): Max Days since posting that a job needs to be
+            added to the report
     Returns:
         job_listings (List of Dicts): A list of Dicts. Key is the job ID and the
             dict holds all of the job listing details.
@@ -147,10 +156,14 @@ def get_job_listings_from_indeed(
 
     job_listings = {}
 
+    # Settings
+    jobs_per_listing_page = indeed.Indeed.jobs_per_listing_page
+    max_pagination_no_increment = 5
+
     job_listing_pagination = 0
     pagination_non_increment_counter = 0
-    while job_listing_pagination < min_jobs_to_find:
-        logging.info(f"Finding Jobs ({job_listing_pagination} of {min_jobs_to_find})")
+    while len(job_listings) < min_jobs_to_find:
+        logging.info(f"Finding Jobs ({len(job_listings)} of {min_jobs_to_find})")
 
         new_job_listings = indeed.Indeed.get_job_listings(
             job_title,
@@ -159,14 +172,18 @@ def get_job_listings_from_indeed(
             job_type=job_type,
             salary_min=salary_min,
             pagination=job_listing_pagination,
+            max_days_since_posting=max_days_since_posting
         )
 
+        new_job_found = False
         for job_listing in new_job_listings:
-            job_listings[job_listing["job_id"]] = job_listing
+            if job_listing["job_id"] not in job_listings:
+                job_listings[job_listing["job_id"]] = job_listing
+                new_job_found = True
 
         if (
-            job_listing_pagination == len(job_listings)
-            and pagination_non_increment_counter < 5
+            not new_job_found
+            and pagination_non_increment_counter < max_pagination_no_increment
         ):
             logging.info(
                 "No Unqiue Jobs Found On Loop (This is loop "
@@ -175,8 +192,8 @@ def get_job_listings_from_indeed(
             pagination_non_increment_counter += 1
             continue
         elif (
-            job_listing_pagination == len(job_listings)
-            and pagination_non_increment_counter >= 5
+            not new_job_found
+            and pagination_non_increment_counter >= max_pagination_no_increment
         ):
             logging.info(
                 "No Unqiue Jobs Found On Loop (This is loop "
@@ -184,14 +201,20 @@ def get_job_listings_from_indeed(
             )
             break
         else:
-            job_listing_pagination = len(job_listings)
+            job_listing_pagination += jobs_per_listing_page
             pagination_non_increment_counter = 0
 
     return job_listings
 
 
 def get_job_listings_from_monster(
-    job_title, zip_code, radius, job_type, salary_min, min_jobs_to_find
+    job_title,
+    zip_code,
+    radius,
+    job_type,
+    salary_min,
+    min_jobs_to_find,
+    max_days_since_posting,
 ):
     """
     Purpose:
@@ -209,6 +232,8 @@ def get_job_listings_from_monster(
         min_jobs_to_find (String): How many jobs to attempt to find. will loop through
             calls to Monster until this number is met or if 5 calls in a row yeild
             no new results
+        max_days_since_posting (Int): Max Days since posting that a job needs to be
+            added to the report
     Returns:
         job_listings (List of Dicts): A list of Dicts. Key is the job ID and the
             dict holds all of the job listing details.
@@ -221,7 +246,13 @@ def get_job_listings_from_monster(
 
 
 def get_job_listings_from_career_builder(
-    job_title, zip_code, radius, job_type, salary_min, min_jobs_to_find
+    job_title,
+    zip_code,
+    radius,
+    job_type,
+    salary_min,
+    min_jobs_to_find,
+    max_days_since_posting,
 ):
     """
     Purpose:
@@ -239,6 +270,8 @@ def get_job_listings_from_career_builder(
         min_jobs_to_find (String): How many jobs to attempt to find. will loop through
             calls to Career Builder until this number is met or if 5 calls in a row yeild
             no new results
+        max_days_since_posting (Int): Max Days since posting that a job needs to be
+            added to the report
     Returns:
         job_listings (List of Dicts): A list of Dicts. Key is the job ID and the
             dict holds all of the job listing details.
@@ -825,6 +858,14 @@ def get_cli_arguments():
         help="What is the base salary",
         type=str,
         default="$40,000",
+        required=False,
+    )
+    optional.add_argument(
+        "--max-days-since-posting",
+        dest="max_days_since_posting",
+        help="How many days in the past can jobs have been posted to be considered",
+        type=int,
+        default=7,
         required=False,
     )
 
