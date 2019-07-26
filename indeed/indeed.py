@@ -39,6 +39,7 @@ class Indeed(object):
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36",
     }
+    jobs_per_listing_page = 18
 
     ###
     # Class Lifecycle Methods
@@ -66,7 +67,8 @@ class Indeed(object):
         radius=15,
         job_type="fulltime",
         salary_min="$40,000",
-        pagination=0
+        pagination=0,
+        max_days_since_posting=7,
     ):
         """
         Purpose:
@@ -101,29 +103,42 @@ class Indeed(object):
 
         # Parsing The Job HTML
         if raw_job_listing_html:
-            job_listings = Indeed.parse_job_listings_html(raw_job_listing_html)
+            base_job_listings = Indeed.parse_job_listings_html(raw_job_listing_html)
         else:
             logging.error(f"Failed to Fetch Job Listings from Indeed URL, exiting")
 
         # Get More Information For Each Job Listing
-        for job_listing in job_listings:
+        for base_job_listing in base_job_listings:
 
             # Add Job Type As A Field
             if job_type == "fulltime":
-                job_listing["job_type"] = "Full Time"
+                base_job_listing["job_type"] = "Full Time"
             elif job_type == "partime":
-                job_listing["job_type"] = "Part Time"
+                base_job_listing["job_type"] = "Part Time"
             else:
-                job_listing["job_type"] = "Unknown"
+                base_job_listing["job_type"] = "Unknown"
 
             # Get Job Details
             job_details = Indeed.get_job_details(
-                job_listing["company"],
-                job_listing["job_title"],
-                job_listing["job_id"],
+                base_job_listing["company"],
+                base_job_listing["job_title"],
+                base_job_listing["job_id"],
             )
             for job_detail, job_detail_value in job_details.items():
-                job_listing[job_detail] = job_detail_value
+                base_job_listing[job_detail] = job_detail_value
+
+        # Check each listing to see if it should be added to the return list
+        cutoff_posting_date = (
+            datetime.now() -
+            timedelta(days=max_days_since_posting) -
+            timedelta(hours=1)
+        )
+        for base_job_listing in base_job_listings:
+            if not base_job_listing["job_posting_datetime"]:
+                continue
+            elif base_job_listing["job_posting_datetime"] < cutoff_posting_date:
+                continue
+            job_listings.append(base_job_listing)
 
         return sorted(job_listings, key = lambda i: i["company"])
 
